@@ -1,4 +1,31 @@
-# Buy or Wait? — AI-Powered Financial Decision Agent
+# BUY-or-WAIT
+
+AI-assisted financial decision system for the HackerRank Orchestrate
+September 2026 "Buy or Wait?" challenge.
+
+This repository extends the official HackerRank starter repository.
+
+Official challenge documentation:
+- AGENTS.md
+- CLAUDE.md
+- problem_statement.md
+
+The planned architecture combines:
+
+AI understanding
++
+deterministic financial simulation
++
+constraint validation
++
+explainable decision making
+
+The implementation is not complete yet. This repository currently provides the
+repository setup, official starter files, official dataset files, and the planned
+software structure. The solution is designed to use AI understanding for parsing
+financial messages and images, deterministic financial simulation for forecasts
+and payment safety checks, constraint validation for plan safety, and
+explainable decision making for the final recommendations.
 
 ## Overview
 
@@ -39,10 +66,27 @@ Possible recommendations include:
 * wait and pay later
 * not recommended
 
-The final results are written to:
+The official starter dataset also provides the organizer-maintained template file:
+
+```text
+dataset/output.csv
+```
+
+The final generated submission artifact will be written to:
 
 ```text
 output.csv
+```
+
+These are different concepts: the first is the challenge-provided template in the
+official dataset folder, and the second is the generated final decision artifact.
+
+Local/ignored files are also part of the project workflow:
+
+```text
+.env
+log.txt
+submission/
 ```
 
 ---
