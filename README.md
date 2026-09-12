@@ -172,7 +172,7 @@ This ensures that important financial decisions remain deterministic and reprodu
 # Project Structure
 
 ```text
-hackerrank-orchestrate-september26/
+BUY-or-WAIT/
 │
 ├── code/
 │   ├── main.py
@@ -187,42 +187,43 @@ hackerrank-orchestrate-september26/
 │   ├── message_parser.py
 │   ├── image_parser.py
 │   ├── currency.py
-│   ├── explanation.py
-│   ├── audit.py
-│   └── config.py
-│
-├── prompts/
-│   ├── message_parser_prompt.txt
-│   ├── image_parser_prompt.txt
-│   └── explanation_prompt.txt
+│   └── explanation.py
 │
 ├── dataset/
 │   ├── requests.csv
+│   ├── sample_requests.csv
 │   ├── financial_profiles.csv
 │   ├── financial_events.csv
 │   ├── request_payment_options.csv
 │   ├── messages.csv
 │   ├── images.csv
 │   ├── exchange_rates.csv
+│   ├── output.csv
 │   └── media/
 │       └── images/
 │
 ├── tests/
 │
-├── cache/
-│
-├── logs/
-│
 ├── evaluation/
 │   └── usage_report.md
 │
-├── submission/
+├── prompts/
 │
 ├── requirements.txt
-├── .env.example
 ├── .gitignore
 ├── README.md
 └── AGENTS.md
+```
+
+Planned additions that are not part of the current checked-in repository tree:
+
+```text
+cache/
+logs/
+code/audit.py
+prompts/message_parser_prompt.txt
+prompts/image_parser_prompt.txt
+prompts/explanation_prompt.txt
 ```
 
 ---

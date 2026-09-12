@@ -80,17 +80,31 @@ def normalize_ids(df, columns):
     for col in columns:
         if col in df.columns:
             df[col] = df[col].astype("string").str.strip()
+            # Keep empty ID fields nullish instead of converting to the
+            # literal string 'nan' or introducing a float-like nonsense.
+            df[col] = df[col].replace("", pd.NA)
 
     return df
 
 
 def normalize_dates(df, columns):
     for col in columns:
-        if col in df.columns:
+        if col not in df.columns:
+            continue
+
+        if col == "sent_at":
+            # Convert message timestamps to a safe challenge-naive form.
+            # The incoming timestamps are UTC-aware strings in messages.csv,
+            # so first parse as UTC and then drop timezone information.
             df[col] = pd.to_datetime(
                 df[col],
                 errors="coerce",
-                utc=(col == "sent_at"),
+                utc=True,
+            ).dt.tz_convert(None)
+        else:
+            df[col] = pd.to_datetime(
+                df[col],
+                errors="coerce",
             )
 
     return df
