@@ -3,6 +3,10 @@ from decimal import Decimal
 import pandas as pd
 
 from forecast import simulate_forecast
+from spending_changes import (
+    simulate_with_spending_changes,
+    spending_permissions,
+)
 
 
 ZERO = Decimal("0")
@@ -32,6 +36,7 @@ STATUS_METHODS = {
     },
 
     "affordable_with_plan": {
+        "full_payment",
         "partial_payment",
         "installments",
     },
@@ -57,20 +62,30 @@ def close_money(a, b):
     a = dec(a)
     b = dec(b)
 
-    if a is None or b is None:
+    if (
+        a is None
+        or b is None
+    ):
         return False
 
-    return abs(a - b) <= CENT
+    return (
+        abs(a - b)
+        <= CENT
+    )
 
 
 def validate_basic_fields(
     state,
     decision,
-    errors
+    errors,
 ):
     if (
-        decision.get("request_id")
-        != state["request_id"]
+        decision.get(
+            "request_id"
+        )
+        != state[
+            "request_id"
+        ]
     ):
         errors.append(
             "request_id does not match state"
@@ -84,20 +99,30 @@ def validate_basic_fields(
         "recommended_payment_method"
     )
 
-    if status not in VALID_STATUSES:
+    if (
+        status
+        not in VALID_STATUSES
+    ):
         errors.append(
-            f"invalid affordability_status: {status}"
+            f"invalid affordability_status: "
+            f"{status}"
         )
 
-    if method not in VALID_METHODS:
+    if (
+        method
+        not in VALID_METHODS
+    ):
         errors.append(
-            f"invalid payment method: {method}"
+            f"invalid payment method: "
+            f"{method}"
         )
 
     if (
         status in STATUS_METHODS
         and method
-        not in STATUS_METHODS[status]
+        not in STATUS_METHODS[
+            status
+        ]
     ):
         errors.append(
             "affordability status and "
@@ -108,7 +133,7 @@ def validate_basic_fields(
 def validate_safe_amount(
     state,
     decision,
-    errors
+    errors,
 ):
     amount = dec(
         decision.get(
@@ -141,26 +166,39 @@ def validate_safe_amount(
 def validate_earliest_date(
     state,
     decision,
-    errors
+    errors,
 ):
     value = decision.get(
         "earliest_date_for_full_payment"
     )
 
-    if value is None or pd.isna(value):
+    if (
+        value is None
+        or pd.isna(value)
+    ):
         return
 
     date = pd.Timestamp(
         value
     ).normalize()
 
-    if date < state["request_date"]:
+    if (
+        date
+        < state[
+            "request_date"
+        ]
+    ):
         errors.append(
             "earliest full payment date "
             "is before request date"
         )
 
-    if date > state["forecast_end"]:
+    if (
+        date
+        > state[
+            "forecast_end"
+        ]
+    ):
         errors.append(
             "earliest full payment date "
             "is outside forecast window"
@@ -169,7 +207,7 @@ def validate_earliest_date(
 
 def validate_no_plan_decision(
     decision,
-    errors
+    errors,
 ):
     if (
         decision[
@@ -190,27 +228,32 @@ def validate_no_plan_decision(
             "not_recommended"
         )
 
-    if decision.get(
-        "selected_candidate"
-    ) is not None:
+    if (
+        decision.get(
+            "selected_candidate"
+        )
+        is not None
+    ):
         errors.append(
             "not_affordable decision "
             "must not have selected candidate"
         )
 
 
-def payment_total(payments):
+def payment_total(
+    payments
+):
     total = ZERO
 
     for payment in payments:
         amount = dec(
-            payment.get("amount")
+            payment.get(
+                "amount"
+            )
         )
 
-        if amount is None:
-            continue
-
-        total += amount
+        if amount is not None:
+            total += amount
 
     return total
 
@@ -218,7 +261,7 @@ def payment_total(payments):
 def validate_payment_dates(
     state,
     candidate,
-    errors
+    errors,
 ):
     payments = candidate.get(
         "payments",
@@ -228,7 +271,9 @@ def validate_payment_dates(
     previous = None
 
     for payment in payments:
-        date = payment.get("date")
+        date = payment.get(
+            "date"
+        )
 
         if date is None:
             errors.append(
@@ -240,7 +285,12 @@ def validate_payment_dates(
             date
         ).normalize()
 
-        if date < state["request_date"]:
+        if (
+            date
+            < state[
+                "request_date"
+            ]
+        ):
             errors.append(
                 "payment occurs before "
                 "request date"
@@ -257,7 +307,12 @@ def validate_payment_dates(
                 "desired completion date"
             )
 
-        if date > state["forecast_end"]:
+        if (
+            date
+            > state[
+                "forecast_end"
+            ]
+        ):
             errors.append(
                 "payment occurs outside "
                 "90-day forecast window"
@@ -278,7 +333,7 @@ def validate_payment_dates(
 def validate_payment_amounts(
     state,
     candidate,
-    errors
+    errors,
 ):
     payments = candidate.get(
         "payments",
@@ -293,7 +348,9 @@ def validate_payment_amounts(
 
     for payment in payments:
         amount = dec(
-            payment.get("amount")
+            payment.get(
+                "amount"
+            )
         )
 
         if amount is None:
@@ -321,7 +378,9 @@ def validate_payment_amounts(
     }:
         if not close_money(
             total,
-            state["requested_amount"]
+            state[
+                "requested_amount"
+            ],
         ):
             errors.append(
                 "payment total does not equal "
@@ -341,7 +400,7 @@ def validate_payment_amounts(
 
     elif not close_money(
         total,
-        total_payable
+        total_payable,
     ):
         errors.append(
             "payment schedule total does not "
@@ -352,7 +411,7 @@ def validate_payment_amounts(
 def validate_installment_option(
     state,
     candidate,
-    errors
+    errors,
 ):
     if (
         candidate[
@@ -368,7 +427,9 @@ def validate_installment_option(
 
     if (
         option_id is None
-        or pd.isna(option_id)
+        or pd.isna(
+            option_id
+        )
     ):
         errors.append(
             "installment candidate has "
@@ -403,7 +464,9 @@ def validate_installment_option(
     option = match.iloc[0]
 
     if (
-        option["payment_method"]
+        option[
+            "payment_method"
+        ]
         != "installments"
     ):
         errors.append(
@@ -424,7 +487,10 @@ def validate_installment_option(
         )
     )
 
-    if actual_count != expected_count:
+    if (
+        actual_count
+        != expected_count
+    ):
         errors.append(
             "installment payment count "
             "does not match dataset"
@@ -444,7 +510,7 @@ def validate_installment_option(
 
     if not close_money(
         expected_total,
-        candidate_total
+        candidate_total,
     ):
         errors.append(
             "installment total payable "
@@ -452,7 +518,9 @@ def validate_installment_option(
         )
 
     expected_fee = dec(
-        option["financing_fee"]
+        option[
+            "financing_fee"
+        ]
     )
 
     candidate_fee = dec(
@@ -475,7 +543,7 @@ def validate_installment_option(
 
     if not close_money(
         expected_fee,
-        candidate_fee
+        candidate_fee,
     ):
         errors.append(
             "installment financing fee "
@@ -483,22 +551,187 @@ def validate_installment_option(
         )
 
 
+def validate_spending_changes(
+    state,
+    candidate,
+    errors,
+):
+    permissions = (
+        spending_permissions(
+            state
+        )
+    )
+
+    protected = permissions[
+        "protected"
+    ]
+
+    reducible = permissions[
+        "reducible"
+    ]
+
+    stoppable = permissions[
+        "stoppable"
+    ]
+
+    reductions = candidate.get(
+        "spending_reductions",
+        {},
+    )
+
+    stopped = set(
+        candidate.get(
+            "stopped_categories",
+            [],
+        )
+    )
+
+    for category, fraction in (
+        reductions.items()
+    ):
+        category = str(
+            category
+        ).strip().lower()
+
+        fraction = dec(
+            fraction
+        )
+
+        if category in protected:
+            errors.append(
+                f"protected category changed: "
+                f"{category}"
+            )
+
+        if (
+            category
+            not in reducible
+        ):
+            errors.append(
+                f"category not allowed "
+                f"to reduce: {category}"
+            )
+
+        if (
+            fraction is None
+            or fraction <= ZERO
+            or fraction > Decimal("1")
+        ):
+            errors.append(
+                f"invalid reduction for "
+                f"{category}"
+            )
+
+    for category in stopped:
+        category = str(
+            category
+        ).strip().lower()
+
+        if category in protected:
+            errors.append(
+                f"protected category stopped: "
+                f"{category}"
+            )
+
+        if (
+            category
+            not in stoppable
+        ):
+            errors.append(
+                f"category not allowed "
+                f"to stop: {category}"
+            )
+
+    description = str(
+        candidate.get(
+            "spending_changes_needed",
+            "none",
+        )
+    ).strip().lower()
+
+    has_changes = bool(
+        reductions
+        or stopped
+    )
+
+    if (
+        has_changes
+        and description == "none"
+    ):
+        errors.append(
+            "spending changes exist but "
+            "description says none"
+        )
+
+    if (
+        not has_changes
+        and description != "none"
+    ):
+        errors.append(
+            "spending change description "
+            "exists without actual changes"
+        )
+
+    if (
+        candidate[
+            "affordability_status"
+        ]
+        == "affordable_now"
+        and has_changes
+    ):
+        errors.append(
+            "affordable_now cannot require "
+            "spending changes"
+        )
+
+
 def validate_forecast_safety(
     state,
     data,
     candidate,
-    errors
+    errors,
 ):
     payments = candidate.get(
         "payments",
         []
     )
 
-    result = simulate_forecast(
-        state,
-        data,
-        extra_payments=payments
+    reductions = candidate.get(
+        "spending_reductions",
+        {},
     )
+
+    stopped = candidate.get(
+        "stopped_categories",
+        [],
+    )
+
+    has_changes = bool(
+        reductions
+        or stopped
+    )
+
+    if has_changes:
+        result = (
+            simulate_with_spending_changes(
+                state,
+                data,
+                reductions=
+                    reductions,
+                stopped_categories=
+                    stopped,
+                extra_payments=
+                    payments,
+            )
+        )
+
+    else:
+        result = simulate_forecast(
+            state,
+            data,
+            extra_payments=
+                payments,
+        )
 
     if not result["is_safe"]:
         errors.append(
@@ -511,7 +744,7 @@ def validate_candidate(
     state,
     data,
     decision,
-    errors
+    errors,
 ):
     candidate = decision.get(
         "selected_candidate"
@@ -535,8 +768,7 @@ def validate_candidate(
         candidate[
             "recommended_payment_method"
         ]
-        !=
-        decision[
+        != decision[
             "recommended_payment_method"
         ]
     ):
@@ -549,8 +781,7 @@ def validate_candidate(
         candidate[
             "affordability_status"
         ]
-        !=
-        decision[
+        != decision[
             "affordability_status"
         ]
     ):
@@ -562,64 +793,70 @@ def validate_candidate(
     validate_payment_dates(
         state,
         candidate,
-        errors
+        errors,
     )
 
     validate_payment_amounts(
         state,
         candidate,
-        errors
+        errors,
     )
 
     validate_installment_option(
         state,
         candidate,
-        errors
+        errors,
+    )
+
+    validate_spending_changes(
+        state,
+        candidate,
+        errors,
     )
 
     validate_forecast_safety(
         state,
         data,
         candidate,
-        errors
+        errors,
     )
 
 
 def validate_decision(
     state,
     data,
-    decision
+    decision,
 ):
     errors = []
 
     validate_basic_fields(
         state,
         decision,
-        errors
+        errors,
     )
 
     validate_safe_amount(
         state,
         decision,
-        errors
+        errors,
     )
 
     validate_earliest_date(
         state,
         decision,
-        errors
+        errors,
     )
 
     validate_no_plan_decision(
         decision,
-        errors
+        errors,
     )
 
     validate_candidate(
         state,
         data,
         decision,
-        errors
+        errors,
     )
 
     return {
@@ -630,24 +867,28 @@ def validate_decision(
             errors,
 
         "request_id":
-            state["request_id"],
+            state[
+                "request_id"
+            ],
     }
 
 
 def require_valid_decision(
     state,
     data,
-    decision
+    decision,
 ):
     result = validate_decision(
         state,
         data,
-        decision
+        decision,
     )
 
     if not result["valid"]:
         message = "; ".join(
-            result["errors"]
+            result[
+                "errors"
+            ]
         )
 
         raise ValueError(

@@ -2,23 +2,16 @@ import sys
 from decimal import Decimal
 from pathlib import Path
 
-ROOT = Path(
-    __file__
-).resolve().parent.parent
-
+ROOT = Path(__file__).resolve().parent.parent
 CODE = ROOT / "code"
 
-sys.path.insert(
-    0,
-    str(CODE)
-)
+sys.path.insert(0, str(CODE))
 
 from loader import load_all
 from normalizer import normalize_all
-from financial_state import (
-    build_financial_state
-)
+from financial_state import build_financial_state
 from forecast import simulate_forecast
+from spending_changes import simulate_with_spending_changes
 from plans import (
     generate_plans,
     format_payment_plan,
@@ -35,14 +28,12 @@ def test_payment_plan_format():
     payments = [
         {
             "date": "2026-09-07",
-            "amount":
-                Decimal("300")
+            "amount": Decimal("300"),
         },
         {
             "date": "2026-10-07",
-            "amount":
-                Decimal("300")
-        }
+            "amount": Decimal("300"),
+        },
     ]
 
     result = format_payment_plan(
@@ -97,7 +88,6 @@ def test_candidates_respect_deadline():
             "request_id"
         ]
     ):
-
         state = build_financial_state(
             data,
             request_id
@@ -111,7 +101,6 @@ def test_candidates_respect_deadline():
         for candidate in result[
             "candidates"
         ]:
-
             assert (
                 candidate[
                     "last_payment_date"
@@ -126,8 +115,6 @@ def test_candidates_respect_deadline():
 def test_every_generated_candidate_is_safe():
     data = get_data()
 
-    # Check a useful subset to keep
-    # the test reasonably fast.
     request_ids = (
         data["requests"][
             "request_id"
@@ -137,7 +124,6 @@ def test_every_generated_candidate_is_safe():
     )
 
     for request_id in request_ids:
-
         state = build_financial_state(
             data,
             request_id
@@ -152,20 +138,58 @@ def test_every_generated_candidate_is_safe():
             "candidates"
         ]:
 
-            forecast = (
-                simulate_forecast(
-                    state,
-                    data,
-                    extra_payments=
-                        candidate[
-                            "payments"
-                        ]
-                )
+            reductions = candidate.get(
+                "spending_reductions",
+                {},
             )
+
+            stopped = candidate.get(
+                "stopped_categories",
+                [],
+            )
+
+            has_changes = bool(
+                reductions
+                or stopped
+            )
+
+            if has_changes:
+                forecast = (
+                    simulate_with_spending_changes(
+                        state,
+                        data,
+                        reductions=reductions,
+                        stopped_categories=stopped,
+                        extra_payments=
+                            candidate[
+                                "payments"
+                            ],
+                    )
+                )
+
+            else:
+                forecast = (
+                    simulate_forecast(
+                        state,
+                        data,
+                        extra_payments=
+                            candidate[
+                                "payments"
+                            ],
+                    )
+                )
 
             assert forecast[
                 "is_safe"
-            ]
+            ], (
+                request_id,
+                candidate[
+                    "recommended_payment_method"
+                ],
+                candidate.get(
+                    "spending_changes_needed"
+                ),
+            )
 
 
 def test_installments_match_supplied_option():
@@ -180,7 +204,6 @@ def test_installments_match_supplied_option():
     )
 
     for request_id in request_ids:
-
         state = build_financial_state(
             data,
             request_id
@@ -257,7 +280,6 @@ def test_partial_plan_has_exactly_two_payments():
     )
 
     for request_id in request_ids:
-
         state = build_financial_state(
             data,
             request_id
@@ -288,8 +310,9 @@ def test_partial_plan_has_exactly_two_payments():
             )
 
             total = sum(
-                p["amount"]
-                for p in candidate[
+                payment["amount"]
+                for payment
+                in candidate[
                     "payments"
                 ]
             )
@@ -311,7 +334,6 @@ def test_all_requests_generate_plans():
             "request_id"
         ]
     ):
-
         state = build_financial_state(
             data,
             request_id
