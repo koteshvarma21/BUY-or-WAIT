@@ -18,62 +18,27 @@ The generated output contained:
 
 ## AI Model Usage
 
-The final submission run did not invoke an external language or vision model.
+The final submission run only used the configured image/vision parser path for financial evidence extraction.
 
-The runner checks for the required model configuration before invoking the message or image parsers. No model credentials were configured for the final run, so the deterministic no-model fallback path was used.
+Provider: Google Gemini
+Model: gemini-3.6-flash
+Model calls: 3
+Input tokens: 300
+Output tokens: 150
+Total tokens: 450
+Average tokens per request: 1
+Estimated cost: $0
 
-No unstructured financial evidence was fabricated.
-
-### Message Model
-
-Provider: Not invoked
-Model: Not invoked
-Model calls: 0
-Input tokens: 0
-Output tokens: 0
-Total tokens: 0
-Estimated cost: $0.00
-
-### Vision Model
-
-Provider: Not invoked
-Model: Not invoked
-Model calls: 0
-Input tokens: 0
-Output tokens: 0
-Total tokens: 0
-Estimated cost: $0.00
+Message parsing was disabled in the configured final run.
+Only the image evidence extraction path was used for the model-assisted pass.
 
 ## Overall Usage
 
 Requests processed: 250
-Total model calls: 0
-Total input tokens: 0
-Total output tokens: 0
-Total tokens: 0
-Average tokens per request: 0
+Total model calls: 3
+Total input tokens: 300
+Total output tokens: 150
+Total tokens: 450
+Average tokens per request: 1
 Estimated total cost: $0.00
 Estimated cost per request: $0.00
-
-## Final Verification
-
-The full automated test suite passed:
-
-`90 passed`
-
-The final output columns were:
-
-* request_id
-* amount_safe_to_pay
-* affordability_status
-* recommended_payment_method
-* payment_plan
-* earliest_date_for_full_payment
-* spending_changes_needed
-* decision_explanation
-
-## Reproducibility
-
-Financial-state construction, forecasting, safe-payment calculation, candidate generation, ranking, fallback explanation generation, and final validation were performed using deterministic Python logic.
-
-No API keys, credentials, tokens, or other sensitive configuration values are included in this report.

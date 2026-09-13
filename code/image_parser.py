@@ -2,6 +2,7 @@ import base64
 import json
 import mimetypes
 import os
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -18,6 +19,9 @@ IMAGE_DIR = (
     / "media"
     / "images"
 )
+
+CACHE_DIR = BASE_DIR / ".image_cache"
+CACHE_FILE = CACHE_DIR / "image_results.json"
 
 PROMPT_PATH = (
     BASE_DIR
@@ -611,6 +615,62 @@ def normalize_result(
     }
 
 
+def load_image_cache():
+    CACHE_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    if not CACHE_FILE.exists():
+        return {}
+
+    try:
+        data = json.loads(
+            CACHE_FILE.read_text(
+                encoding="utf-8"
+            )
+        )
+    except Exception:
+        return {}
+
+    if not isinstance(
+        data,
+        dict,
+    ):
+        return {}
+
+    return data
+
+
+def save_image_cache(image_id, result, usage):
+    if not image_id:
+        return
+
+    CACHE_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    cache = load_image_cache()
+    cache[image_id] = {
+        "result": result,
+        "usage": usage or {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
+    }
+
+    CACHE_FILE.write_text(
+        json.dumps(
+            cache,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
 def get_llm_config():
     base_url = os.getenv(
         "LLM_BASE_URL"
@@ -706,6 +766,10 @@ def call_model(
         "temperature":
             0,
 
+        "response_format": {
+            "type": "json_object"
+        },
+
         "messages": [
             {
                 "role":
@@ -744,23 +808,90 @@ def call_model(
         ],
     }
 
-    response = requests.post(
-        (
-            base_url
-            + "/chat/completions"
-        ),
-        headers={
-            "Authorization":
-                f"Bearer {api_key}",
+    response = None
 
-            "Content-Type":
-                "application/json",
-        },
-        json=payload,
-        timeout=timeout,
-    )
+    for attempt in range(6):
+        response = requests.post(
+            (
+                base_url
+                + "/chat/completions"
+            ),
+            headers={
+                "Authorization":
+                    f"Bearer {api_key}",
 
-    response.raise_for_status()
+                "Content-Type":
+                    "application/json",
+            },
+            json=payload,
+            timeout=timeout,
+        )
+
+        if response.status_code == 429:
+            retry_after = response.headers.get(
+                "Retry-After"
+            )
+            delay = None
+
+            try:
+                delay = int(
+                    retry_after
+                )
+            except Exception:
+                delay = None
+
+            if delay is None:
+                try:
+                    body = response.json()
+                except Exception:
+                    body = {}
+
+                details = body.get("error", {}).get("details", []) or []
+                for item in details:
+                    if isinstance(item, dict) and item.get("@type") == "type.googleapis.com/google.rpc.RetryInfo":
+                        retry_delay = item.get("retryDelay")
+                        if isinstance(retry_delay, str):
+                            text = retry_delay.strip().lower()
+                            if text.endswith("s"):
+                                try:
+                                    delay = int(float(text[:-1]))
+                                except Exception:
+                                    delay = None
+                            else:
+                                try:
+                                    delay = int(float(text))
+                                except Exception:
+                                    delay = None
+                            break
+
+                if delay is None:
+                    delay = 20 * (attempt + 1)
+
+            delay = min(
+                max(0, int(delay)),
+                60,
+            )
+
+            print(
+                f"Rate limited for {image_id}. "
+                f"Retrying in {delay}s..."
+            )
+
+            time.sleep(delay)
+
+            if attempt == 5:
+                break
+
+            continue
+
+        break
+
+    if response is None or response.status_code >= 400:
+        raise RuntimeError(
+            f"Gemini request failed "
+            f"({getattr(response, 'status_code', 'unknown')}): "
+            f"{getattr(response, 'text', '')}"
+        )
 
     body = response.json()
 
@@ -884,14 +1015,47 @@ def parse_all_images(
         "model_calls": 0,
     }
 
-    for _, row in images.iterrows():
-        result, usage = (
-            parse_image(
-                row,
-                model_caller=
-                    model_caller,
+    cache = load_image_cache()
+
+    for index, row in images.iterrows():
+        image_id = clean_optional(
+            row.get(
+                "image_id"
             )
         )
+
+        if image_id in cache:
+            result = cache[image_id].get(
+                "result"
+            )
+            usage = cache[image_id].get(
+                "usage",
+                {},
+            )
+            if isinstance(result, dict):
+                results.append(result)
+                merge_usage(
+                    usage_total,
+                    usage,
+                )
+                usage_total[
+                    "model_calls"
+                ] += 1
+                continue
+
+        try:
+            result, usage = (
+                parse_image(
+                    row,
+                    model_caller=
+                        model_caller,
+                )
+            )
+        except Exception as exc:
+            print(
+                f"Skipping image {image_id} after parse failure: {exc}"
+            )
+            continue
 
         results.append(
             result
@@ -905,6 +1069,18 @@ def parse_all_images(
         usage_total[
             "model_calls"
         ] += 1
+
+        save_image_cache(
+            image_id,
+            result,
+            usage,
+        )
+
+        if (
+            model_caller is None
+            and index < len(images) - 1
+        ):
+            time.sleep(20)
 
     return (
         results,

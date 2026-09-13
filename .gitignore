@@ -5,5 +5,6 @@ __pycache__/
 .venv/
 venv/
 submission/
+.image_cache/
 
 /output.csv
